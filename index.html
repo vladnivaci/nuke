@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>nuke — lost bags find their way</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --white:#ffffff;
+    --paper:#f6f6f4;
+    --line:#e2e2df;
+    --gray:#8a8a86;
+    --gray-dark:#57574f;
+    --ink:#17171a;
+    --black:#0a0a0b;
+    --lost:#d6402c;
+    --ease: cubic-bezier(.22,.61,.36,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--white);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{
+    font-family:'Space Grotesk',sans-serif;
+    letter-spacing:-0.02em;
+    font-weight:600;
+  }
+  a{color:inherit;text-decoration:none;}
+  button{font-family:inherit;}
+
+  ::selection{background:var(--ink);color:var(--white);}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important;}
+  }
+
+  /* ---------- nav ---------- */
+  .nav{
+    position:fixed; top:0; left:0; right:0; z-index:100;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:28px clamp(20px,5vw,64px);
+    mix-blend-mode:difference;
+  }
+  .nav .word{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:22px;
+    color:#fff;
+    letter-spacing:-0.03em;
+  }
+  .nav .cta{
+    font-size:14px; color:#fff; border:1px solid rgba(255,255,255,.5);
+    padding:9px 18px; border-radius:100px;
+    transition:border-color .3s var(--ease), background .3s var(--ease);
+  }
+  .nav .cta:hover{border-color:#fff; background:rgba(255,255,255,.08);}
+
+  section{position:relative;}
+
+  /* ---------- progress rail ---------- */
+  .rail{
+    position:fixed; left:0; top:0; width:3px; height:100vh; z-index:99;
+    background:transparent;
+  }
+  .rail-fill{
+    width:100%; height:0%; background:var(--ink); transition:height .05s linear;
+  }
+
+  /* ================= HERO (one continuous scene) ================= */
+  .hero{
+    height:520vh;
+    background:var(--white);
+  }
+  .hero-stage{
+    position:sticky; top:0; height:100vh; width:100%;
+    overflow:hidden;
+    background:var(--white);
+  }
+  /* Title card: sits on an opaque white plate over the whole stage, so nothing
+     shows through behind it. A short scroll fades the whole card out and hands
+     the screen over to the animation. */
+  .hero-copy{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center;
+    background:var(--white);
+    z-index:5; pointer-events:none;
+    will-change:opacity;
+  }
+  .hero-word{
+    font-size:clamp(40px,7vw,64px);
+    font-weight:700;
+    letter-spacing:-0.04em;
+  }
+  .hero-tag{
+    margin-top:18px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:500;
+    font-size:clamp(26px,4.2vw,44px);
+    line-height:1.08;
+    color:var(--ink);
+  }
+  .hero-sub{
+    margin-top:16px;
+    font-size:15px; color:var(--gray); letter-spacing:0.01em;
+  }
+
+  /* Full-page scene. Video and sticker PNG are stacked in the SAME fixed box with the
+     SAME object-fit + object-position, so the video's last frame and the PNG land on
+     identical pixels regardless of viewport size. Both are 16:9 sources. */
+  .scene{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    background:var(--white);
+    overflow:hidden;
+  }
+  .hero-video, .sticker-png{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:contain;     /* whole frame visible, never cropped */
+    object-position:center center;
+    background:var(--white);
+  }
+  .sticker-png{
+    opacity:0;
+    z-index:2;
+    pointer-events:none;
+  }
+
+  /* Ripple that radiates from the sticker into the page background */
+  .ripple{
+    position:absolute; left:50%; top:50%;
+    width:min(22vw,260px); height:min(22vw,260px);
+    border-radius:50%;
+    border:1.5px solid rgba(23,23,26,.38);
+    transform:translate(-50%,-50%) scale(.55);
+    opacity:0;
+    pointer-events:none;
+    z-index:3;
+  }
+  .ripple.go{ animation:ripple 2.4s var(--ease) forwards; }
+  .ripple.r2.go{ animation-delay:.28s; }
+  .ripple.r3.go{ animation-delay:.56s; }
+  @keyframes ripple{
+    0%  { transform:translate(-50%,-50%) scale(.55); opacity:0; }
+    10% { opacity:.85; }
+    100%{ transform:translate(-50%,-50%) scale(11); opacity:0; }
+  }
+
+  /* Leader lines + labels, positioned in % of the 16:9 scene so they track
+     the sticker wherever the canvas scales. */
+  .leaders{
+    position:absolute; z-index:4; pointer-events:none;
+  }
+  .leaders svg{
+    position:absolute; inset:0; width:100%; height:100%;
+    overflow:visible;
+  }
+  .leaders path{
+    fill:none; stroke:var(--ink); stroke-width:1.2;
+    stroke-linecap:round;
+    stroke-dasharray:1; stroke-dashoffset:1;
+    /* pathLength=1 on each path lets one dashoffset drive draw-in */
+  }
+  .leaders circle{ fill:var(--ink); opacity:0; }
+  .label{
+    position:absolute;
+    opacity:0; transform:translateY(6px);
+    transition:opacity .45s var(--ease), transform .45s var(--ease);
+    max-width:210px;
+  }
+  .label .t{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:clamp(12px,1.3vw,15px); color:var(--ink); }
+  .label .d{ font-size:clamp(11px,1.05vw,13px); color:var(--gray); margin-top:2px; line-height:1.35; }
+  .label.left{ text-align:right; }
+  .label.on{ opacity:1; transform:translateY(0); }
+
+  /* label anchor positions (percent of scene) */
+  .lab-nuke  { left:4%;   top:24%; }
+  .lab-tap   { right:4%;  top:24%; }
+  .lab-nfc   { left:4%;   top:62%; }
+  .lab-qr    { right:4%;  top:58%; }
+  .lab-id    { right:4%;  top:78%; }
+
+  @media (max-width:720px){
+    .label{ max-width:130px; }
+    .lab-nuke  { left:1%; top:12%; }
+    .lab-tap   { right:1%; top:12%; }
+    .lab-nfc   { left:1%; top:70%; }
+    .lab-qr    { right:1%; top:62%; }
+    .lab-id    { right:1%; top:84%; }
+  }
+
+  .scroll-hint{
+    position:absolute; bottom:clamp(24px,4vh,44px); left:50%; transform:translateX(-50%);
+    z-index:6;
+    font-size:11px; letter-spacing:.12em; color:var(--gray);
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    opacity:1; transition:opacity .4s ease;
+  }
+  .scroll-hint .line{width:1px; height:26px; background:var(--gray); position:relative; overflow:hidden;}
+  .scroll-hint .line::after{
+    content:''; position:absolute; top:-100%; left:0; width:100%; height:100%;
+    background:var(--ink); animation:hint 1.8s ease-in-out infinite;
+  }
+  @keyframes hint{ to{ top:100%; } }
+
+  /* ================= HOW IT WORKS ================= */
+  .steps{
+    background:var(--paper);
+    padding:160px clamp(20px,6vw,80px);
+  }
+  .steps-head{
+    text-align:center; max-width:560px; margin:0 auto 100px;
+  }
+  .steps-head h2{font-size:clamp(30px,4vw,44px); font-weight:500;}
+  .steps-grid{
+    max-width:920px; margin:0 auto;
+    display:flex; flex-direction:column;
+  }
+  .step{
+    display:grid; grid-template-columns:80px 1fr; gap:32px;
+    padding:44px 0; border-top:1px solid var(--line);
+    opacity:0.25; transform:translateY(16px);
+    transition:opacity .7s var(--ease), transform .7s var(--ease);
+  }
+  .step.on{opacity:1; transform:translateY(0);}
+  .step:last-child{border-bottom:1px solid var(--line);}
+  .step .num{font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--gray);}
+  .step h3{font-size:clamp(20px,2.6vw,26px); font-weight:500; margin-bottom:10px;}
+  .step p{color:var(--gray-dark); font-size:15px; max-width:480px; line-height:1.5;}
+
+  /* ================= LOST / FOUND ================= */
+  .lostfound{
+    background:var(--black); color:#fff;
+    min-height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    padding:100px 24px;
+  }
+  .lf-inner{ text-align:center; position:relative; }
+  .lf-tag{
+    display:inline-block; font-family:'Space Grotesk',sans-serif; font-weight:700;
+    font-size:14px; letter-spacing:.08em; color:var(--lost);
+    border:1px solid rgba(214,64,44,.5); padding:6px 16px; border-radius:100px;
+    opacity:0; transition:opacity .5s ease;
+  }
+  .lf-tag.on{opacity:1;}
+  .lf-line{
+    margin-top:34px; font-family:'Space Grotesk',sans-serif; font-weight:500;
+    font-size:clamp(26px,4vw,42px); color:#8a8a8e;
+    transition:color .6s ease;
+  }
+  .lf-line.on{color:#fff;}
+  .lf-sub{ margin-top:18px; font-size:15px; color:#6f6f73; opacity:0; transition:opacity .6s ease .1s;}
+  .lf-sub.on{opacity:1;}
+  .lf-notify{
+    margin:44px auto 0; width:min(86vw,300px); background:#141416; border:1px solid #26262a;
+    border-radius:18px; padding:18px 20px; text-align:left;
+    opacity:0; transform:translateY(16px); transition:opacity .5s ease, transform .5s ease;
+  }
+  .lf-notify.on{opacity:1; transform:translateY(0);}
+  .lf-notify .h{font-size:12px; color:#7c7c80; margin-bottom:6px;}
+  .lf-notify .m{font-size:14px;}
+  .lf-notify .m2{font-size:12px; color:#7c7c80; margin-top:8px;}
+
+  /* ================= DASHBOARD ================= */
+  .platform{
+    background:#fff; padding:160px clamp(20px,6vw,80px);
+  }
+  .platform-head{ text-align:center; max-width:600px; margin:0 auto 70px; }
+  .platform-head h2{font-size:clamp(30px,4vw,44px); font-weight:500;}
+  .dash{
+    max-width:980px; margin:0 auto; border:1px solid var(--line); border-radius:20px;
+    overflow:hidden; opacity:0; transform:translateY(24px); transition:opacity .7s var(--ease), transform .7s var(--ease);
+  }
+  .dash.on{opacity:1; transform:translateY(0);}
+  .dash-top{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 24px; border-bottom:1px solid var(--line); background:var(--paper);
+  }
+  .dash-top .name{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px;}
+  .dash-top .loc{font-size:12px; color:var(--gray);}
+  .dash-grid{ display:grid; grid-template-columns:repeat(4,1fr); }
+  .dash-cell{ padding:26px 24px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .dash-cell:nth-child(4n){border-right:none;}
+  .dash-cell .k{font-size:12px; color:var(--gray); margin-bottom:8px;}
+  .dash-cell .v{font-family:'Space Grotesk',sans-serif; font-size:26px; font-weight:600;}
+  .dash-cell .v.lost{color:var(--lost);}
+  @media (max-width:720px){
+    .dash-grid{grid-template-columns:repeat(2,1fr);}
+    .dash-cell:nth-child(2n){border-right:none;}
+  }
+
+  .no-app{
+    max-width:640px; margin:80px auto 0; text-align:center;
+  }
+  .no-app .row{
+    display:flex; justify-content:center; gap:clamp(16px,4vw,48px); flex-wrap:wrap;
+    margin-bottom:28px;
+  }
+  .no-app .item{font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:18px; color:var(--gray-dark);}
+  .no-app p{color:var(--gray); font-size:15px; line-height:1.6;}
+
+  /* ================= BUSINESS MODEL ================= */
+  .model{
+    background:var(--paper); padding:160px clamp(20px,6vw,80px);
+    text-align:center;
+  }
+  .model h2{font-size:clamp(30px,4vw,44px); font-weight:500; max-width:560px; margin:0 auto 90px;}
+  .flow{
+    display:flex; flex-direction:column; align-items:center; gap:0;
+    max-width:300px; margin:0 auto 90px;
+  }
+  .flow .node{
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px;
+    border:1px solid var(--line); background:#fff; padding:16px 32px; border-radius:100px;
+    opacity:0.2; transform:scale(.94); transition:opacity .5s var(--ease), transform .5s var(--ease);
+  }
+  .flow .node.on{opacity:1; transform:scale(1);}
+  .flow .arrow{ height:34px; width:1px; background:var(--line); position:relative; }
+  .flow .arrow.on::after{
+    content:''; position:absolute; top:0; left:-3px; width:7px; height:7px; border-radius:50%;
+    background:var(--ink); animation:flowdot 1.4s var(--ease) infinite;
+  }
+  @keyframes flowdot{ 0%{top:0;opacity:0;} 15%{opacity:1;} 100%{top:100%; opacity:0;} }
+  .model-note{ color:var(--gray); font-size:15px; max-width:420px; margin:0 auto; }
+
+  /* ================= ROADMAP ================= */
+  .roadmap{
+    background:#fff; padding:160px clamp(20px,6vw,80px);
+  }
+  .roadmap h2{text-align:center; font-size:clamp(30px,4vw,44px); font-weight:500; margin-bottom:90px;}
+  .rm-grid{
+    max-width:1000px; margin:0 auto;
+    display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line);
+    border:1px solid var(--line);
+  }
+  .rm-cell{ background:#fff; padding:36px 26px; }
+  .rm-cell .when{font-size:12px; color:var(--gray); letter-spacing:.02em; margin-bottom:14px;}
+  .rm-cell .what{font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:500; line-height:1.3;}
+  @media (max-width:800px){ .rm-grid{grid-template-columns:1fr 1fr;} }
+  @media (max-width:480px){ .rm-grid{grid-template-columns:1fr;} }
+
+  /* ================= FINAL CTA ================= */
+  .final{
+    background:var(--black); color:#fff;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:60px 24px;
+  }
+  .final .word{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(32px,5vw,48px); margin-bottom:36px;}
+  .final h2{font-size:clamp(26px,3.6vw,38px); font-weight:500; max-width:640px; line-height:1.25;}
+  .final .sub{margin-top:20px; font-size:15px; color:#88888c; max-width:440px; line-height:1.6;}
+  .final .btn{
+    margin-top:48px; display:inline-block; background:#fff; color:#0a0a0b;
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;
+    padding:16px 34px; border-radius:100px; transition:transform .3s var(--ease);
+  }
+  .final .btn:hover{ transform:scale(1.04); }
+  footer{
+    margin-top:100px; display:flex; gap:32px; font-size:12px; color:#5a5a5e;
+  }
+</style>
+</head>
+<body>
+
+<div class="rail"><div class="rail-fill" id="railFill"></div></div>
+
+<nav class="nav">
+  <span class="word">nuke</span>
+  <a href="#final" class="cta">Talk to NUKE</a>
+</nav>
+
+<!-- ================= HERO (video -> PNG -> ripple -> leader lines) ================= -->
+<section class="hero" id="hero">
+  <div class="hero-stage">
+    <div class="hero-copy" id="heroCopy">
+      <div class="hero-word">nuke</div>
+      <div class="hero-tag">Lost bags find their way.</div>
+      <div class="hero-sub">A smarter baggage recovery system.</div>
+    </div>
+
+    <div class="scene" id="scene">
+      <div class="ripple r1" id="rip1"></div>
+      <div class="ripple r2" id="rip2"></div>
+      <div class="ripple r3" id="rip3"></div>
+
+      <video
+        class="hero-video"
+        id="heroVideo"
+        src="https://d8j0ntlcm91z4.cloudfront.net/user_3GAQjwU6kGgxGfG7jv3Sd7VRxpK/hf_20260908_090124_240f7129-7f69-4d31-9022-bec6d8ad426d.mp4"
+        muted
+        playsinline
+        preload="auto"
+      ></video>
+
+      <!-- Same generated frame as the video's last frame: identical box, identical fit. -->
+      <img class="sticker-png" id="stickerPng"
+           src="https://d8j0ntlcm91z4.cloudfront.net/user_3GAQjwU6kGgxGfG7jv3Sd7VRxpK/hf_20260908_084523_624fca60-dbc5-4778-aefa-0c9ec8a3127e.png"
+           alt="NUKE sticker: nuke wordmark, NFC, QR code, unique bag ID">
+
+      <div class="leaders" id="leaders">
+        <svg viewBox="0 0 160 90" preserveAspectRatio="none" aria-hidden="true">
+          <!-- coordinates are in a 160x90 (16:9) space; sticker sits roughly x 60..100, y 30..60 -->
+          <path pathLength="1" d="M 66 37 C 50 37, 40 31, 26 28"/>
+          <circle cx="66" cy="37" r="0.9"/>
+          <path pathLength="1" d="M 94 36 C 108 36, 118 30, 134 28"/>
+          <circle cx="94" cy="36" r="0.9"/>
+          <path pathLength="1" d="M 67 51 C 52 51, 42 58, 26 60"/>
+          <circle cx="67" cy="51" r="0.9"/>
+          <path pathLength="1" d="M 95 49 C 110 49, 120 54, 134 56"/>
+          <circle cx="95" cy="49" r="0.9"/>
+          <path pathLength="1" d="M 95 57 C 112 60, 122 68, 134 72"/>
+          <circle cx="95" cy="57" r="0.9"/>
+        </svg>
+
+        <div class="label left lab-nuke"><div class="t">nuke</div><div class="d">The brand mark. Every sticker is issued and registered by NUKE.</div></div>
+        <div class="label lab-tap"><div class="t">Tap or scan to return</div><div class="d">The only instruction a finder needs. No app, no account.</div></div>
+        <div class="label left lab-nfc"><div class="t">NFC</div><div class="d">Tap a phone to open the bag's page instantly.</div></div>
+        <div class="label lab-qr"><div class="t">QR code</div><div class="d">Universal fallback. Works with any camera.</div></div>
+        <div class="label lab-id"><div class="t">Unique bag ID</div><div class="d">A secure token, not personal data. Links this bag to its booking.</div></div>
+      </div>
+    </div>
+
+    <div class="scroll-hint" id="scrollHint">
+      <span>SCROLL</span>
+      <div class="line"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section class="steps" id="steps">
+  <div class="steps-head">
+    <h2>From check-in to recovery.</h2>
+  </div>
+  <div class="steps-grid">
+    <div class="step">
+      <div class="num">01</div>
+      <div>
+        <h3>Check in</h3>
+        <p>The passport is scanned, the bag is weighed, and the NUKE sticker is applied. The journey begins at check-in.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">02</div>
+      <div>
+        <h3>Connect</h3>
+        <p>The sticker's ID is linked to the bag and the booking. One bag, one digital identity.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">03</div>
+      <div>
+        <h3>Travel</h3>
+        <p>The bag moves through the airport's infrastructure. NUKE works invisibly, throughout the journey.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">04</div>
+      <div>
+        <h3>Recover</h3>
+        <p>If a bag is found, a tap or scan opens a page instantly. Found doesn't have to mean lost.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= LOST / FOUND ================= -->
+<section class="lostfound" id="lostfound">
+  <div class="lf-inner">
+    <span class="lf-tag" id="lfTag">LOST</span>
+    <div class="lf-line" id="lfLine">Someone taps the sticker.</div>
+    <div class="lf-sub" id="lfSub">No app. No account. Just a tap.</div>
+    <div class="lf-notify" id="lfNotify">
+      <div class="h">NUKE · now</div>
+      <div class="m">Your luggage has been found.</div>
+      <div class="m2">Frankfurt Airport · 18:42</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DASHBOARD / PLATFORM ================= -->
+<section class="platform" id="platform">
+  <div class="platform-head">
+    <h2>Behind every sticker is a system.</h2>
+  </div>
+  <div class="dash" id="dash">
+    <div class="dash-top">
+      <span class="name">NUKE Airport Console</span>
+      <span class="loc">Frankfurt Airport (FRA)</span>
+    </div>
+    <div class="dash-grid">
+      <div class="dash-cell"><div class="k">Active bags</div><div class="v">48,204</div></div>
+      <div class="dash-cell"><div class="k">Recovered today</div><div class="v">312</div></div>
+      <div class="dash-cell"><div class="k">Lost bags</div><div class="v lost">7</div></div>
+      <div class="dash-cell"><div class="k">Recovery rate</div><div class="v">99.4%</div></div>
+    </div>
+  </div>
+
+  <div class="no-app">
+    <div class="row">
+      <span class="item">No app.</span>
+      <span class="item">No account.</span>
+      <span class="item">No extra step.</span>
+    </div>
+    <p>Airport staff apply the sticker during the existing baggage check-in process. NUKE fits into the workflow that's already there.</p>
+  </div>
+</section>
+
+<!-- ================= BUSINESS MODEL ================= -->
+<section class="model" id="model">
+  <h2>Built for airports. Designed for scale.</h2>
+  <div class="flow" id="flow">
+    <div class="node">Airport / Airline</div>
+    <div class="arrow"></div>
+    <div class="node">NUKE</div>
+    <div class="arrow"></div>
+    <div class="node">Bag</div>
+    <div class="arrow"></div>
+    <div class="node">Passenger</div>
+  </div>
+  <p class="model-note">The airport pays for the infrastructure. The passenger uses it for free.</p>
+</section>
+
+<!-- ================= ROADMAP ================= -->
+<section class="roadmap" id="roadmap">
+  <h2>Roadmap</h2>
+  <div class="rm-grid">
+    <div class="rm-cell"><div class="when">Today</div><div class="what">NFC + QR smart baggage identification.</div></div>
+    <div class="rm-cell"><div class="when">Next</div><div class="what">RFID integration.</div></div>
+    <div class="rm-cell"><div class="when">Then</div><div class="what">Advanced tracking.</div></div>
+    <div class="rm-cell"><div class="when">Future</div><div class="what">A global baggage recovery network.</div></div>
+  </div>
+</section>
+
+<!-- ================= FINAL CTA ================= -->
+<section class="final" id="final">
+  <div class="word">nuke</div>
+  <h2>The future of baggage recovery starts with one sticker.</h2>
+  <div class="sub">Built for airports. Airlines. And every journey in between.</div>
+  <a href="mailto:hello@nuke.com" class="btn">Talk to NUKE</a>
+  <footer>
+    <span>nuke.com</span>
+    <span>© 2026 NUKE</span>
+  </footer>
+</section>
+
+<script>
+(function(){
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var railFill = document.getElementById('railFill');
+  var hero = document.getElementById('hero');
+  var heroCopy = document.getElementById('heroCopy');
+  var heroVideo = document.getElementById('heroVideo');
+  var stickerPng = document.getElementById('stickerPng');
+  var scrollHint = document.getElementById('scrollHint');
+  var ripples = [document.getElementById('rip1'), document.getElementById('rip2'), document.getElementById('rip3')];
+  var leaderPaths = Array.prototype.slice.call(document.querySelectorAll('#leaders path'));
+  var leaderDots  = Array.prototype.slice.call(document.querySelectorAll('#leaders circle'));
+  var labels      = Array.prototype.slice.call(document.querySelectorAll('#leaders .label'));
+  var videoReady = false;
+  var videoDuration = 0;
+  var rippleFired = false;
+
+  // Scroll timeline inside the hero (fractions of hero scroll progress):
+  var T_TITLE_OUT   = 0.08; // 0 -> 0.08 : short scroll fades the title card away
+  var T_VIDEO_END   = 0.60; // 0.08 -> 0.60 : video scrubbed by scroll, full screen
+  var T_PNG_IN      = 0.68; // sticker PNG fades over the video's last frame
+  var T_LINES_START = 0.74; // lines may only start once the 2s ripple beat has played
+  var T_LINES_END   = 0.98;
+  var LINES_DELAY_MS = 2000; // ripple plays, then a 2s beat, then the lines
+  var linesArmed = false;
+  var linesTimer = null;
+
+  heroVideo.addEventListener('loadedmetadata', function(){
+    videoDuration = heroVideo.duration || 0;
+    videoReady = videoDuration > 0;
+    fitLeaders();   // video box height is only known once metadata lands
+    onScroll();
+  });
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function lerp(a,b,t){ return a + (b-a)*t; }
+
+  function heroProgress(){
+    var rect = hero.getBoundingClientRect();
+    var total = hero.offsetHeight - window.innerHeight;
+    var scrolled = -rect.top;
+    return clamp(scrolled/total, 0, 1);
+  }
+
+  // Keep the leader-line layer glued to the 16:9 content box that object-fit:cover
+  // actually renders, so percent coordinates always land on the sticker.
+  var sceneEl = document.getElementById('scene');
+  var leadersEl = document.getElementById('leaders');
+  function fitLeaders(){
+    // Mirror the media box exactly: same offsets, same contain-fit geometry,
+    // so lines and ripples originate on the sticker itself.
+    var box = heroVideo.getBoundingClientRect();
+    var sceneBox = sceneEl.getBoundingClientRect();
+    var w = box.width, h = box.height;
+    var scale = Math.min(w/16, h/9);      // object-fit: contain
+    var cw = 16*scale, ch = 9*scale;
+    var left = (box.left - sceneBox.left) + (w - cw)/2;
+    var top  = (box.top  - sceneBox.top ) + (h - ch)/2;
+
+    leadersEl.style.left   = left + 'px';
+    leadersEl.style.top    = top + 'px';
+    leadersEl.style.width  = cw + 'px';
+    leadersEl.style.height = ch + 'px';
+
+    // ripples emanate from the centre of that same content box
+    ripples.forEach(function(r){
+      r.style.left = (left + cw/2) + 'px';
+      r.style.top  = (top + ch/2) + 'px';
+    });
+  }
+  fitLeaders();
+  window.addEventListener('resize', fitLeaders);
+
+  function fireRipple(){
+    if(rippleFired) return;
+    rippleFired = true;
+    if(!reduced){ ripples.forEach(function(r){ r.classList.add('go'); }); }
+    // hold the lines back for two seconds so the ripple gets its own moment
+    clearTimeout(linesTimer);
+    linesTimer = setTimeout(function(){
+      linesArmed = true;
+      onScroll();
+    }, reduced ? 0 : LINES_DELAY_MS);
+  }
+  function resetRipple(){
+    if(!rippleFired) return;
+    rippleFired = false;
+    linesArmed = false;
+    clearTimeout(linesTimer);
+    ripples.forEach(function(r){ r.classList.remove('go'); });
+  }
+
+  function onScroll(){
+    var docH = document.documentElement.scrollHeight - window.innerHeight;
+    var p = clamp(window.scrollY/docH, 0, 1);
+    railFill.style.height = (p*100)+'%';
+
+    var hp = heroProgress();
+    scrollHint.style.opacity = String(clamp(1 - hp/T_TITLE_OUT, 0, 1));
+
+    // 0) title card fades out over a short scroll, then the stage is all animation
+    var titleT = clamp(hp / T_TITLE_OUT, 0, 1);
+    heroCopy.style.opacity = String(1 - titleT);
+
+    // 1) scroll progress -> video progress (forward on scroll down, reverse on scroll up)
+    //    starts only once the title is gone, so nothing plays behind the type
+    if(videoReady){
+      var vp = clamp((hp - T_TITLE_OUT) / (T_VIDEO_END - T_TITLE_OUT), 0, 1);
+      var vt = vp * videoDuration;
+      if(Math.abs(heroVideo.currentTime - vt) > 0.01){ heroVideo.currentTime = vt; }
+    }
+
+    // 2) PNG overlay fades over the final frame -> seamless hand-off from video to graphic
+    var pngT = clamp((hp - T_VIDEO_END) / (T_PNG_IN - T_VIDEO_END), 0, 1);
+    stickerPng.style.opacity = pngT;
+
+    // 3) ripple from the sticker into the page, once, right after the hand-off
+    if(pngT >= 1){ fireRipple(); } else if(hp < T_VIDEO_END){ resetRipple(); }
+
+    // 4) leader lines draw in, staggered, driven by scroll
+    var n = leaderPaths.length;
+    var span = (T_LINES_END - T_LINES_START) / n;
+    leaderPaths.forEach(function(path, i){
+      var start = T_LINES_START + i*span;
+      var t = linesArmed ? clamp((hp - start) / span, 0, 1) : 0;
+      path.style.strokeDashoffset = String(1 - t);
+      if(leaderDots[i]) leaderDots[i].style.opacity = t > 0.05 ? '1' : '0';
+      if(labels[i]){ if(t >= 0.85){ labels[i].classList.add('on'); } else { labels[i].classList.remove('on'); } }
+    });
+  }
+
+  document.addEventListener('scroll', function(){ requestAnimationFrame(onScroll); }, {passive:true});
+  window.addEventListener('resize', onScroll);
+  onScroll();
+
+  // Generic reveal-on-view for simple elements
+  var revealTargets = document.querySelectorAll('.step, .dash, .flow .node, .flow .arrow');
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('on'); }
+    });
+  }, {threshold:0.35});
+  revealTargets.forEach(function(el){ io.observe(el); });
+
+
+  // Lost/found sequence
+  var lf = document.getElementById('lostfound');
+  var lfTag = document.getElementById('lfTag');
+  var lfLine = document.getElementById('lfLine');
+  var lfSub = document.getElementById('lfSub');
+  var lfNotify = document.getElementById('lfNotify');
+  var lfPlayed = false;
+  var ioLf = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting && !lfPlayed){
+        lfPlayed = true;
+        setTimeout(function(){ lfTag.classList.add('on'); }, 100);
+        setTimeout(function(){ lfLine.classList.add('on'); lfLine.textContent = 'A bag is separated from its flow.'; }, 500);
+        setTimeout(function(){ lfSub.classList.add('on'); }, 900);
+        setTimeout(function(){
+          lfLine.textContent = 'Someone taps the sticker.';
+          lfSub.textContent = 'No app. No account. Just a tap.';
+        }, 2400);
+        setTimeout(function(){ lfNotify.classList.add('on'); }, 3000);
+      }
+    });
+  }, {threshold:0.5});
+  ioLf.observe(lf);
+})();
+</script>
+</body>
+</html>
